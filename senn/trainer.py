@@ -669,12 +669,13 @@ class DiSENN_Trainer(SENN_Trainer):
         self.model.eval()
 
         # select test example
-        (test_batch, _) = next(iter(self.test_loader))
+        (test_batch, lables) = next(iter(self.test_loader))
         for i in range(num):
             file_path = Path("results")
             file_name = file_path / self.config.exp_name / "explanations.png"
             x = test_batch[i].float().to(self.config.device)
-            self.model.explain(x, save_as=file_name)
+            contrast_class = labels[i].item()  # True label for the i-th input
+            self.model.explain(x, contrast_class=contrast_class, save_as=file_name)
 
     def print_n_save_metrics(self, filename, total_loss,
                              classification_loss, robustness_loss,

@@ -251,7 +251,7 @@ class DiSENN(nn.Module):
         contrast_colors = ['g' if r > 0 else 'r' for r in product_contrast]
 
         # plot input image, relevances, concepts, prototypes side by side
-        plt.style.use('seaborn-paper')
+        #plt.style.use('seaborn-paper')
         fig = plt.figure(figsize=figure_size)
         ax1 = plt.subplot2grid(gridsize, (0, 0))
         ax2 = plt.subplot2grid(gridsize, (0, 1))

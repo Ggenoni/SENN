@@ -1,0 +1,8 @@
+# seaborn-paper.mplstyle
+axes.titlesize: 18
+axes.labelsize: 14
+figure.dpi: 100
+grid.color: #e5e5e5
+grid.linestyle: --
+xtick.labelsize: 12
+ytick.labelsize: 12

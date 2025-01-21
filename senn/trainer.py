@@ -22,7 +22,7 @@ from .utils.plot_utils import *
 from .datasets.dataloaders import get_dataloader
 
 
-plt.style.use('seaborn-talk')
+#plt.style.use('seaborn-talk')
 
 RESULTS_DIR = 'results'
 CHECKPOINT_DIR = 'checkpoints'

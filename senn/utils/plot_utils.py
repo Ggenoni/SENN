@@ -14,7 +14,7 @@ RESULTS_DIR = 'results'
 CONFIG_DIR = 'configs'
 RESULTS_FILENAME = 'accuracies_losses_valid.csv'
 
-plt.style.use('seaborn-paper')
+#plt.style.use('seaborn-paper')
 
 
 def get_comparison_plot(images, model):
@@ -228,7 +228,7 @@ def show_explainations(model, test_loader, dataset, num_explanations=2, save_pat
     concepts_max = concepts.max().item()
     concept_lim = abs(concepts_min) if abs(concepts_min) > abs(concepts_max) else abs(concepts_max)
 
-    plt.style.use('seaborn-paper')
+    #plt.style.use('seaborn-paper')
     batch_idx = np.random.randint(0, batch_size - 1, num_explanations)
     for i in range(num_explanations):
         if concept_names is not None:

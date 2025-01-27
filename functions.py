@@ -1,3 +1,23 @@
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from captum.attr import IntegratedGradients
+from skimage.metrics import structural_similarity as ssim
+from torchvision.transforms import functional as TF
+import random
+from skimage.color import gray2rgb, rgb2gray, label2rgb
+from lime.wrappers.scikit_image import SegmentationAlgorithm
+from lime import lime_image
+from functools import partial
+
+# ==> CHOOSE THE BEST SEGMENTATION ALGORITHM <==
+segmenter = SegmentationAlgorithm('slic', n_segments=100, compactness=10)
+# segmenter = SegmentationAlgorithm('quickshift', kernel_size=1, max_dist=150, ratio=0.2)
+# segmenter = SegmentationAlgorithm('felzenszwalb', scale=100, sigma=0.8, min_size=5)
+
+# Initialize the LIME Image Explainer
+explainer = lime_image.LimeImageExplainer()
+
 ## FUNCTIONS FOR INTEGRATED GRADIENTS
 
 # Function to calculate completeness gap
@@ -181,11 +201,12 @@ def compute_sensitivity(model, input_image, baseline, target_class, num_perturba
 
 ## FUNCTIONS FOR LIME 
 
-def predict_function(images):
+def predict_function(images, model):
     """
     Prediction function for LIME.
     Takes RGB images, converts them to grayscale, and returns probabilities.
     """
+
     # Convert RGB (3 channels) to grayscale (1 channel)
     grayscale_images = np.array([rgb2gray(image) for image in images])  # Shape: (batch_size, H, W)
 
@@ -196,15 +217,18 @@ def predict_function(images):
     images_tensor = torch.tensor(grayscale_images).float()
     images_tensor = (images_tensor - 0.1307) / 0.3081  # MNIST normalization
 
+    # Ensure the model is in evaluation mode
+    model.eval()
+
     # Pass through the model
     with torch.no_grad():
-        outputs = mnist_SENN(images_tensor)
+        outputs = model(images_tensor)
         logits = outputs[0]
 
     return logits.softmax(dim=1).numpy()  # Convert logits to probabilities
 
 
-def predict_on_masked_superpixels(image, superpixel_steps=[1, 3, 5, 10, 20]):
+def predict_on_masked_superpixels(image, model, superpixel_steps=[1, 3, 5, 10, 20]):
     """
     Visualize the impact of masking specific numbers of top superpixels on the image,
      highlighting masked regions.
@@ -219,10 +243,14 @@ def predict_on_masked_superpixels(image, superpixel_steps=[1, 3, 5, 10, 20]):
     # Convert grayscale image to RGB
     image_rgb = gray2rgb(image)  # Convert grayscale to RGB (HxWxC)
 
+    # Bind the model to the prediction function
+    predict_with_model = partial(predict_function, model=model)
+
+
     # Generate LIME explanation
     explanation = explainer.explain_instance(
         image=image_rgb,
-        classifier_fn=predict_function,
+        classifier_fn=predict_with_model,
         top_labels=1,
         hide_color=0,
         num_samples=1000,
@@ -231,7 +259,7 @@ def predict_on_masked_superpixels(image, superpixel_steps=[1, 3, 5, 10, 20]):
 
     # Get the predicted label and original confidence
     predicted_label = explanation.top_labels[0]
-    original_confidence = predict_function([image_rgb])[0, predicted_label]
+    original_confidence = predict_function([image_rgb], model)[0, predicted_label]
 
     # Print original confidence
     print(f"Original Confidence for Predicted Label {predicted_label}: {original_confidence:.2f}")
@@ -263,7 +291,7 @@ def predict_on_masked_superpixels(image, superpixel_steps=[1, 3, 5, 10, 20]):
             mask_visualization[segments == superpixel] = [1, 0, 0]  # Highlight in red
 
         # Predict confidence and class after perturbation
-        perturbed_probabilities = predict_function([perturbed_image])[0]
+        perturbed_probabilities = predict_function([perturbed_image], model)[0]
         perturbed_confidence = perturbed_probabilities[predicted_label]
         perturbed_prediction = np.argmax(perturbed_probabilities)
 

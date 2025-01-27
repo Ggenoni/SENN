@@ -148,7 +148,7 @@ def apply_challenging_transformations(input_image):
 
 
 # Function to compute Sensitivity Analysis
-def compute_sensitivity(model, input_image, baseline, target_class, num_perturbations=5):
+def sensitivity_analysis(model, input_image, baseline, target_class, challenging_transformations=False, noise_std=0.5, num_perturbations=5):
     """
     Performs sensitivity analysis by applying challenging transformations to the input
     and comparing the resulting attributions.
@@ -176,8 +176,14 @@ def compute_sensitivity(model, input_image, baseline, target_class, num_perturba
     predictions = []
 
     for _ in range(num_perturbations):
-        # Apply challenging transformations to the input image
-        perturbed_input = apply_challenging_transformations(input_image)
+
+        if challenging_transformations:
+            # Apply challenging transformations to the input image
+            perturbed_input = apply_challenging_transformations(input_image)
+        else:
+            # Add Gaussian noise to the input image (with high noise level)
+            noise = torch.randn_like(input_image) * noise_std
+            perturbed_input = input_image + noise
 
         # Compute attributions for the perturbed input
         perturbed_attributions = ig.attribute(perturbed_input, baseline, target=target_class).squeeze().detach().numpy()

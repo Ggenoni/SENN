@@ -194,7 +194,7 @@ def plot_lambda_accuracy(config_list, save_path=None, num_seeds=1, valid=False, 
 
     return fig
 
-
+'''
 def show_explainations(model, test_loader, dataset, num_explanations=2, save_path=None, batch_size=128, concept_names=None,
                        **kwargs):
     """Generates some explanations of model predictions.
@@ -271,6 +271,94 @@ def show_explainations(model, test_loader, dataset, num_explanations=2, save_pat
         plt.tight_layout()
 
         plt.show() if save_path is None else plt.savefig(path.join(save_path, 'explanation_{}.png'.format(i)))
+        plt.close('all')
+'''
+
+def show_explanations(model, test_loader, dataset, num_explanations=2, save_path=None, batch_size=128, concept_names=None,
+                      selected_indices=None, **kwargs):
+    """Generates some explanations of model predictions.
+
+    Parameters
+    ----------
+    model : torch nn.Module
+        model to visualize
+    test_loader: Dataloader object
+        Test set dataloader to iterate over test set.
+    dataset : str
+        Name of the dataset used.
+    save_path : str
+        Directory where the figures are saved. If None, a figure is shown instead.
+    batch_size : int
+        batch_size of test loader
+    selected_indices : list or None
+        Indices of the specific samples to visualize. If None, samples are selected randomly.
+    """
+    device = 'cuda:0' if next(model.parameters()).is_cuda else 'cpu'
+    model.eval()
+
+    # Select test example
+    (test_batch, test_labels) = next(iter(test_loader))
+    test_batch = test_batch.float().to(device)
+
+    # Feed test batch to model to obtain explanation
+    y_pred, (concepts, relevances), _ = model(test_batch)
+    if len(y_pred.size()) > 1:
+        y_pred = y_pred.argmax(1)
+
+    concepts_min = concepts.min().item()
+    concepts_max = concepts.max().item()
+    concept_lim = abs(concepts_min) if abs(concepts_min) > abs(concepts_max) else abs(concepts_max)
+
+    # Determine indices to visualize
+    if selected_indices is not None:
+        if not all(0 <= idx < batch_size for idx in selected_indices):
+            raise ValueError(f"All selected indices must be within the range [0, {batch_size - 1}].")
+        batch_idx = selected_indices
+    else:
+        batch_idx = np.random.randint(0, batch_size, num_explanations)
+
+    for i in range(len(batch_idx)):
+        idx = batch_idx[i]
+        if concept_names is not None:
+            gridsize = (1, 2)
+            fig = plt.figure(figsize=(12, 6))
+            ax1 = plt.subplot2grid(gridsize, (0, 0))
+            ax2 = plt.subplot2grid(gridsize, (0, 1))
+
+            create_barplot(ax1, relevances[idx], y_pred[idx], x_label='Relevances (theta)',
+                           concept_names=concept_names, **kwargs)
+            ax1.xaxis.set_label_position('top')
+            ax1.tick_params(which='major', labelsize=12)
+
+            create_barplot(ax2, concepts[idx], y_pred[idx], x_lim=concept_lim,
+                           x_label='Concepts/Raw Inputs', concept_names=concept_names, **kwargs)
+            ax2.xaxis.set_label_position('top')
+            ax2.tick_params(which='major', labelsize=12)
+
+        else:
+            gridsize = (1, 3)
+            fig = plt.figure(figsize=(9, 3))
+            ax1 = plt.subplot2grid(gridsize, (0, 0))
+            ax2 = plt.subplot2grid(gridsize, (0, 1))
+            ax3 = plt.subplot2grid(gridsize, (0, 2))
+
+            # Figure of example image
+            ax1.imshow(test_batch[idx].squeeze().cpu(), cmap='gray')
+            ax1.set_axis_off()
+            ax1.set_title(f'Input Prediction: {y_pred[idx].item()}', fontsize=18)
+
+            create_barplot(ax2, relevances[idx], y_pred[idx], x_label='Relevances (theta)', **kwargs)
+            ax2.xaxis.set_label_position('top')
+            ax2.tick_params(which='major', labelsize=12)
+
+            create_barplot(ax3, concepts[idx], y_pred[idx], x_lim=concept_lim,
+                           x_label='Concept activations (h)', **kwargs)
+            ax3.xaxis.set_label_position('top')
+            ax3.tick_params(which='major', labelsize=12)
+
+        plt.tight_layout()
+
+        plt.show() if save_path is None else plt.savefig(path.join(save_path, f'explanation_{i}.png'))
         plt.close('all')
 
 

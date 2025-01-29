@@ -10,13 +10,214 @@ from lime.wrappers.scikit_image import SegmentationAlgorithm
 from lime import lime_image
 from functools import partial
 
-# ==> CHOOSE THE BEST SEGMENTATION ALGORITHM <==
-segmenter = SegmentationAlgorithm('slic', n_segments=100, compactness=10)
-# segmenter = SegmentationAlgorithm('quickshift', kernel_size=1, max_dist=150, ratio=0.2)
-# segmenter = SegmentationAlgorithm('felzenszwalb', scale=100, sigma=0.8, min_size=5)
+## FUNCTIONS FOR ABLATION STUDY AND STATS ON SENN
 
-# Initialize the LIME Image Explainer
-explainer = lime_image.LimeImageExplainer()
+# Ablation study
+def evaluate_concept_ablation(model, test_loader, ablated_concept_idx, device='cuda:0'):
+    """
+    Evaluate the faithfulness of built-in explanations via concept ablation.
+
+    Parameters
+    ----------
+    model : nn.Module
+        The SENN model.
+    test_loader : DataLoader
+        Dataloader containing test data.
+    ablated_concept_idx : list[int]
+        List of indices of concepts to ablate (set to zero).
+    device : str
+        The device on which to run the evaluation (e.g., 'cuda:0' or 'cpu').
+
+    Returns
+    -------
+    original_predictions : list
+        Predictions made by the model without ablation.
+    ablated_predictions : list
+        Predictions made by the model after concept ablation.
+    impact_on_prediction : list
+        Boolean list indicating whether the prediction changed after ablation.
+    """
+    model.eval()  # Set model to evaluation mode
+    original_predictions = []
+    ablated_predictions = []
+    impact_on_prediction = []
+
+    # Iterate over the test data
+    for test_batch, _ in test_loader:
+        test_batch = test_batch.to(device).float()
+
+        # Get original predictions and concepts
+        with torch.no_grad():
+            original_preds, (concepts, relevances), _ = model(test_batch)
+            original_preds = original_preds.argmax(dim=1)
+
+        # Ablate the selected concepts by setting them to zero
+        concepts_ablation = concepts.clone()
+        concepts_ablation[:, ablated_concept_idx, :] = 0  # Set specific concepts to 0
+
+        # Recompute predictions with ablated concepts
+        with torch.no_grad():
+            ablated_preds = model.aggregator(concepts_ablation, relevances)
+            ablated_preds = ablated_preds.argmax(dim=1)
+
+        # Compare original and ablated predictions
+        for orig, ablated in zip(original_preds, ablated_preds):
+            original_predictions.append(orig.item())
+            ablated_predictions.append(ablated.item())
+            impact_on_prediction.append(orig.item() != ablated.item())  # Check if prediction changed
+
+    return original_predictions, ablated_predictions, impact_on_prediction
+
+# Relevance scores
+
+def analyze_relevance_scores_by_predicted_class(model, test_loader, num_concepts, device='cuda:0'):
+    """
+    Analyze relevance scores (theta) across the dataset for the predicted class.
+
+    Parameters
+    ----------
+    model : nn.Module
+        The trained SENN model.
+    test_loader : DataLoader
+        The test data loader.
+    num_concepts : int
+        Total number of concepts in the model.
+    device : str
+        Device to run the analysis on ('cuda:0' or 'cpu').
+
+    Returns
+    -------
+    relevance_stats : dict
+        A dictionary containing average and standard deviation of relevance scores for each concept.
+    """
+    model.eval()
+    model.to(device)
+
+    relevance_scores = []
+
+    with torch.no_grad():
+        for test_batch, _ in test_loader:
+            test_batch = test_batch.to(device).float()
+
+            # Forward pass to get predictions and relevance scores
+            y_pred, (_, relevances), _ = model(test_batch)
+            y_pred = y_pred.argmax(dim=1)  # Shape: (batch_size,)
+
+            # Gather relevance scores only for the predicted class
+            batch_relevances = relevances[torch.arange(relevances.size(0)), :, y_pred].cpu().numpy()
+            relevance_scores.append(batch_relevances)
+
+    # Combine all batches into a single array
+    relevance_scores = np.concatenate(relevance_scores, axis=0)  # Shape: (num_samples, num_concepts)
+
+    # Calculate statistics for each concept
+    relevance_stats = {
+        f"{i}": {
+            "mean": np.mean(relevance_scores[:, i]),
+            "std": np.std(relevance_scores[:, i])
+        }
+        for i in range(num_concepts)
+    }
+
+    # Visualize relevance scores
+    concept_means = [stat["mean"] for stat in relevance_stats.values()]
+    concept_stds = [stat["std"] for stat in relevance_stats.values()]
+
+    plt.figure(figsize=(10, 6))
+    x = np.arange(num_concepts)
+
+    # Plot bar chart with error bars
+    plt.bar(x, concept_means, yerr=concept_stds, capsize=5, alpha=0.7, color='blue', label="Mean Relevance")
+    plt.xticks(x, [f"Concept {i+1}" for i in range(num_concepts)])
+    plt.xlabel("Concepts")
+    plt.ylabel("Relevance Scores (Predicted Class)")
+    plt.title("Relevance Scores (Theta) Across the Dataset (Predicted Class Only)")
+    plt.legend()
+    plt.show()
+
+    return relevance_stats
+
+
+# Class specific relevance
+
+def analyze_class_specific_relevance(model, test_loader, num_classes, num_concepts, device='cuda:0'):
+    """
+    Analyze relevance scores (theta) by class across the dataset.
+
+    Parameters
+    ----------
+    model : nn.Module
+        The trained SENN model.
+    test_loader : DataLoader
+        The test data loader.
+    num_classes : int
+        Total number of classes in the dataset (e.g., 10 for MNIST).
+    num_concepts : int
+        Total number of concepts in the model.
+    device : str
+        Device to run the analysis on ('cuda:0' or 'cpu').
+
+    Returns
+    -------
+    class_relevance_stats : dict
+        A dictionary containing the mean and standard deviation of relevance scores for each concept, grouped by class.
+    """
+    model.eval()
+    model.to(device)
+
+    # Initialize containers to store relevance scores by class
+    class_relevance_scores = {cls: [] for cls in range(num_classes)}
+
+    with torch.no_grad():
+        for test_batch, test_labels in test_loader:
+            test_batch = test_batch.to(device).float()
+            test_labels = test_labels.to(device)
+
+            # Forward pass to get predictions and relevance scores
+            y_pred, (_, relevances), _ = model(test_batch)
+            y_pred = y_pred.argmax(dim=1)  # Shape: (batch_size,)
+
+            # Gather relevance scores for the predicted class
+            batch_relevances = relevances[torch.arange(relevances.size(0)), :, y_pred].cpu().numpy()
+
+            # Append relevance scores to the corresponding class
+            for cls in range(num_classes):
+                class_relevance_scores[cls].append(batch_relevances[test_labels.cpu().numpy() == cls])
+
+    # Compute mean and standard deviation of relevance scores for each class and concept
+    class_relevance_stats = {}
+    for cls, relevances in class_relevance_scores.items():
+        if len(relevances) > 0:
+            relevances = np.concatenate(relevances, axis=0)  # Combine all batches
+            class_relevance_stats[cls] = {
+                f"Concept {i+1}": {
+                    "mean": np.mean(relevances[:, i]),
+                    "std": np.std(relevances[:, i])
+                }
+                for i in range(num_concepts)
+            }
+
+    # Visualize relevance scores by class
+    for cls, stats in class_relevance_stats.items():
+        concept_means = [stat["mean"] for stat in stats.values()]
+        concept_stds = [stat["std"] for stat in stats.values()]
+
+        plt.figure(figsize=(10, 6))
+        x = np.arange(num_concepts)
+
+        # Plot bar chart with error bars
+        plt.bar(x, concept_means, yerr=concept_stds, capsize=5, alpha=0.7, color='blue', label=f"Class {cls}")
+        plt.xticks(x, [f"Concept {i+1}" for i in range(num_concepts)])
+        plt.xlabel("Concepts")
+        plt.ylabel("Relevance Scores")
+        plt.title(f"Relevance Scores (Theta) for Class {cls}")
+        plt.legend()
+        plt.show()
+
+    return class_relevance_stats
+
+
+
 
 ## FUNCTIONS FOR INTEGRATED GRADIENTS
 
@@ -206,6 +407,15 @@ def sensitivity_analysis(model, input_image, baseline, target_class, challenging
 
 
 ## FUNCTIONS FOR LIME 
+
+# ==> CHOOSE THE BEST SEGMENTATION ALGORITHM <==
+segmenter = SegmentationAlgorithm('slic', n_segments=100, compactness=10)
+# segmenter = SegmentationAlgorithm('quickshift', kernel_size=1, max_dist=150, ratio=0.2)
+# segmenter = SegmentationAlgorithm('felzenszwalb', scale=100, sigma=0.8, min_size=5)
+
+# Initialize the LIME Image Explainer
+explainer = lime_image.LimeImageExplainer()
+
 
 def predict_function(images, model):
     """

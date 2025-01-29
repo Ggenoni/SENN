@@ -12,7 +12,7 @@
   "aggregator": "SumAggregator",
   "device": "cpu",
   "lr": 2e-4,
-  "epochs": 1,
+  "epochs": 40,
   "robustness_loss": "mnist_robustness_loss",
   "robust_reg": 1e-4,
   "concept_reg": 1,

@@ -10,26 +10,91 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader, random_split
 from torch.utils.data.sampler import SubsetRandomSampler
 from torchvision import datasets
+from torchvision.datasets import MNIST, FashionMNIST
+from torch.utils.data import DataLoader, Dataset, SubsetRandomSampler
+import random
+from PIL import ImageDraw
 
 
 def get_dataloader(config):
-    """Dispatcher that calls dataloader function depending on the configs.
-
-    Parameters
-    ----------
-    config : SimpleNameSpace
-        Contains configs values. Needs to at least have a `dataloader` field.
-    
-    Returns
-    -------
-    Corresponding dataloader.
-    """
+    """Dispatcher that calls dataloader function depending on the configs."""
     if config.dataloader.lower() == 'mnist':
         return load_mnist(**config.__dict__)
-    elif config.dataloader.lower() == 'fashion-mnist':
+    elif config.dataloader.lower() == 'fashionmnist':
         return load_fashion_mnist(**config.__dict__)
+    elif config.dataloader.lower() == 'confounded_mnist':
+        return load_confounded_mnist(**config.__dict__)
+    elif config.dataloader.lower() == 'confounded_fashionmnist':
+        return load_confounded_fashionmnist(**config.__dict__)
     elif config.dataloader.lower() == 'compas':
         return load_compas(**config.__dict__)
+
+class ConfoundedDataset(Dataset):
+    def __init__(self, dataset, is_train=True, dot_size=3):
+        self.dataset = dataset
+        self.is_train = is_train
+        self.dot_size = dot_size
+        self.num_classes = 10  # Both MNIST and Fashion-MNIST have 10 classes
+        self.fixed_positions = self._generate_fixed_positions()
+
+    def _generate_fixed_positions(self):
+        """Assign a fixed dot position for each class in the training set."""
+        positions = {}
+        for label in range(self.num_classes):
+            positions[label] = (random.randint(5, 22), random.randint(5, 22))  # Avoiding edges
+        return positions
+
+    def _add_dot(self, image, label):
+        """Add a dot at a fixed location for training, random for testing."""
+        draw = ImageDraw.Draw(image)
+        
+        if self.is_train:
+            position = self.fixed_positions[label]
+        else:
+            position = (random.randint(5, 22), random.randint(5, 22))
+        
+        draw.ellipse([
+            position[0], position[1], position[0] + self.dot_size, position[1] + self.dot_size
+        ], fill=255)
+        
+        return image
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        image, label = self.dataset[idx]
+        image = self._add_dot(image, label)
+        return transforms.ToTensor()(image), label
+
+def load_confounded_mnist(data_path, batch_size, num_workers=0, valid_size=0.1, **kwargs):
+    return load_confounded_dataset(data_path, batch_size, num_workers, valid_size, dataset_type='mnist')
+
+def load_confounded_fashionmnist(data_path, batch_size, num_workers=0, valid_size=0.1, **kwargs):
+    return load_confounded_dataset(data_path, batch_size, num_workers, valid_size, dataset_type='fashion-mnist')
+
+def load_confounded_dataset(data_path, batch_size, num_workers=0, valid_size=0.1, dataset_type='mnist'):
+    transform = transforms.Compose([transforms.ToTensor()])
+    dataset_cls = MNIST if dataset_type == 'mnist' else FashionMNIST
+
+    train_set = dataset_cls(data_path, train=True, download=True, transform=transforms.ToPILImage())
+    test_set = dataset_cls(data_path, train=False, download=True, transform=transforms.ToPILImage())
+    
+    confounded_train_set = ConfoundedDataset(train_set, is_train=True)
+    confounded_test_set = ConfoundedDataset(test_set, is_train=False)
+    
+    train_size = len(confounded_train_set)
+    split = int(np.floor(valid_size * train_size))
+    indices = list(range(train_size))
+    train_sampler = SubsetRandomSampler(indices[split:])
+    valid_sampler = SubsetRandomSampler(indices[:split])
+    
+    dataloader_args = dict(batch_size=batch_size, num_workers=num_workers, drop_last=True)
+    train_loader = DataLoader(confounded_train_set, sampler=train_sampler, **dataloader_args)
+    valid_loader = DataLoader(confounded_train_set, sampler=valid_sampler, **dataloader_args)
+    test_loader = DataLoader(confounded_test_set, shuffle=False, **dataloader_args)
+    
+    return train_loader, valid_loader, test_loader
 
 
 def load_fashion_mnist(data_path, batch_size, num_workers=0, valid_size=0.1, **kwargs):

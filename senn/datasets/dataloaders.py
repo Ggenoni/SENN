@@ -20,11 +20,11 @@ def get_dataloader(config):
     """Dispatcher that calls dataloader function depending on the configs."""
     if config.dataloader.lower() == 'mnist':
         return load_mnist(**config.__dict__)
-    elif config.dataloader.lower() == 'fashionmnist':
+    elif config.dataloader.lower() == 'fashion-mnist':
         return load_fashion_mnist(**config.__dict__)
-    elif config.dataloader.lower() == 'confounded_mnist':
+    elif config.dataloader.lower() == 'confounded-mnist':
         return load_confounded_mnist(**config.__dict__)
-    elif config.dataloader.lower() == 'confounded_fashionmnist':
+    elif config.dataloader.lower() == 'confounded-fashionmnist':
         return load_confounded_fashionmnist(**config.__dict__)
     elif config.dataloader.lower() == 'compas':
         return load_compas(**config.__dict__)

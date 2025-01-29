@@ -36,27 +36,21 @@ class ConfoundedDataset(Dataset):
         self.dot_size = dot_size
         self.num_classes = 10  # Both MNIST and Fashion-MNIST have 10 classes
         self.fixed_positions = self._generate_fixed_positions()
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.5,), (0.5,))  # Standard normalization
+        ])
 
     def _generate_fixed_positions(self):
-        """Assign a fixed dot position for each class in the training set."""
-        positions = {}
-        for label in range(self.num_classes):
-            positions[label] = (random.randint(5, 22), random.randint(5, 22))  # Avoiding edges
+        positions = {label: (random.randint(5, 22), random.randint(5, 22)) for label in range(self.num_classes)}
         return positions
 
     def _add_dot(self, image, label):
-        """Add a dot at a fixed location for training, random for testing."""
         draw = ImageDraw.Draw(image)
-        
-        if self.is_train:
-            position = self.fixed_positions[label]
-        else:
-            position = (random.randint(5, 22), random.randint(5, 22))
-        
+        position = self.fixed_positions[label] if self.is_train else (random.randint(5, 22), random.randint(5, 22))
         draw.ellipse([
             position[0], position[1], position[0] + self.dot_size, position[1] + self.dot_size
         ], fill=255)
-        
         return image
 
     def __len__(self):
@@ -64,8 +58,10 @@ class ConfoundedDataset(Dataset):
 
     def __getitem__(self, idx):
         image, label = self.dataset[idx]
-        image = self._add_dot(image, label)
-        return transforms.ToTensor()(image), label
+        image = self._add_dot(image, label)  # Add confounder dot
+        image = self.transform(image)  # Convert PIL image to tensor here!
+        return image, label
+
 
 def load_confounded_mnist(data_path, batch_size, num_workers=0, valid_size=0.1, **kwargs):
     return load_confounded_dataset(data_path, batch_size, num_workers, valid_size, dataset_type='mnist')

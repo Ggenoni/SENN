@@ -25,19 +25,29 @@ def highest_activations(model, test_loader, num_concepts=5, num_prototypes=9, sa
     """
     model.eval()
     activations = []
+    
+    # Determine the device (GPU or CPU)
+    device = "cuda:0" if next(model.parameters()).is_cuda else "cpu"
+    
     for x, _ in test_loader:
-        x = x.float().to("cuda:0" if next(model.parameters()).is_cuda else "cpu")
+        x = x.float().to(device)  # Move inputs to the appropriate device
         with torch.no_grad():
             _, (concepts, _), _ = model(x)
-            activations.append(concepts.squeeze())
+            activations.append(concepts.squeeze())  # Collect activations for all batches
+    
     activations = torch.cat(activations)
+    _, top_test_idx = torch.topk(activations, num_prototypes, 0)  # Top activations
 
-    _, top_test_idx = torch.topk(activations, num_prototypes, 0)
+    # Ensure dataset data is on the same device as the indices
+    #device = top_test_idx.device  # Get the device of the indices
+    dataset_data = test_loader.dataset.data.to(device)  # Move dataset to the same device
 
-    top_examples = [test_loader.dataset.data[top_test_idx[:, concept]] for concept in range(num_concepts)]
-    # flatten list and ensure correct image shape
+    # Perform indexing
+    top_examples = [dataset_data[top_test_idx[:, concept]] for concept in range(num_concepts)]
+    
+    # Flatten list and ensure correct image shape
     top_examples = [img.unsqueeze(0) if len(img.size()) == 2 else img for sublist in top_examples for img in sublist]
-
+    
     plt.rcdefaults()
     fig, ax = plt.subplots()
     concept_names = ['Concept {}'.format(i + 1) for i in range(num_concepts)]
@@ -50,15 +60,18 @@ def highest_activations(model, test_loader, num_concepts=5, num_prototypes=9, sa
     plt.xticks([])
     ax.set_xlabel('{} most prototypical data examples per concept'.format(num_prototypes))
     ax.set_title('Concept Prototypes: ')
+    
     save_or_show(make_grid(top_examples, nrow=num_prototypes, pad_value=1), save_path)
     plt.rcdefaults()
+
+
 
 
 def highest_contrast(model, test_loader, num_concepts=5, num_prototypes=9, save_path=None):
     """Creates concept representation via highest contrast.
 
-    The concepts are represented by the most data samples that are most specific to a concept.
-    (The sample that yield the highest activation for each concept while at the same time
+    The concepts are represented by the data samples that are most specific to a concept.
+    (The samples that yield the highest activation for each concept while at the same time
     not activating the other concepts)
 
     Parameters
@@ -76,24 +89,37 @@ def highest_contrast(model, test_loader, num_concepts=5, num_prototypes=9, save_
     """
     model.eval()
     activations = []
+
+    # Determine the device (GPU or CPU)
+    device = "cuda:0" if next(model.parameters()).is_cuda else "cpu"
+
+    # Collect activations from the test set
     for x, _ in test_loader:
-        x = x.float().to("cuda:0" if next(model.parameters()).is_cuda else "cpu")
+        x = x.float().to(device)  # Move inputs to the appropriate device
         with torch.no_grad():
             _, (concepts, _), _ = model(x)
             activations.append(concepts.squeeze())
     activations = torch.cat(activations)
 
+    # Compute contrast scores
     contrast_scores = torch.empty_like(activations)
     for c in range(num_concepts - 1):
         contrast_scores[:, c] = activations[:, c] - (activations[:, :c].sum(dim=1) + activations[:, c + 1:].sum(dim=1))
     contrast_scores[:, num_concepts - 1] = activations[:, num_concepts - 1] - activations[:, :num_concepts - 1].sum(dim=1)
 
+    # Get top indices for contrast scores
     _, top_test_idx = torch.topk(contrast_scores, num_prototypes, 0)
 
-    top_examples = [test_loader.dataset.data[top_test_idx[:, concept]] for concept in range(num_concepts)]
-    # flatten list and ensure correct image shape
+    # Ensure dataset data is on the same device as the indices
+    dataset_data = test_loader.dataset.data.to(device)  # Move dataset data to the correct device
+
+    # Index data with consistent devices
+    top_examples = [dataset_data[top_test_idx[:, concept]] for concept in range(num_concepts)]
+
+    # Flatten list and ensure correct image shape
     top_examples = [img.unsqueeze(0) if len(img.size()) == 2 else img for sublist in top_examples for img in sublist]
 
+    # Plotting the prototypes
     plt.rcdefaults()
     fig, ax = plt.subplots()
     concept_names = ['Concept {}'.format(i + 1) for i in range(num_concepts)]
@@ -106,8 +132,11 @@ def highest_contrast(model, test_loader, num_concepts=5, num_prototypes=9, save_
     plt.xticks([])
     ax.set_xlabel('{} data examples with highest contrast per concept'.format(num_prototypes))
     ax.set_title('Concept Prototypes: ')
+    
+    # Save or show the grid of top examples
     save_or_show(make_grid(top_examples, nrow=num_prototypes, pad_value=1), save_path)
     plt.rcdefaults()
+
 
 
 def filter_concepts(model, num_concepts=5, num_prototypes=10, save_path=None):

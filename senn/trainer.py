@@ -418,7 +418,7 @@ class SENN_Trainer:
         """
         self.model.eval()
 
-        show_explainations(self.model, self.test_loader, self.config.dataloader,
+        show_explanations(self.model, self.test_loader, self.config.dataloader,
                            num_explanations=10, save_path=save_dir, **self.config.__dict__)
 
         if self.config.dataloader == 'mnist':

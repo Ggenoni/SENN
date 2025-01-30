@@ -10,6 +10,48 @@ from lime.wrappers.scikit_image import SegmentationAlgorithm
 from lime import lime_image
 from functools import partial
 
+## PLOT MNIST SAMPLES (1 sample from training set, 1 from validation set, 2 from test set)
+
+def plot_samples(train_samples, val_samples, test_samples, title):
+    fig, axes = plt.subplots(10, 4, figsize=(4 * 2, 20))  # 10 rows (classes), 4 columns
+
+    fig.suptitle(title, fontsize=15, y=0.92)
+
+    for class_label in range(10):  # Iterate over classes (0-9)
+        # Column 1: Training set (1 sample per class)
+        img_train = train_samples[class_label][0] if len(train_samples[class_label]) > 0 else None
+        if img_train is not None:
+            axes[class_label, 0].imshow(img_train.squeeze(), cmap="gray")
+        axes[class_label, 0].axis("off")
+
+        # Column 2: Validation set (1 sample per class)
+        img_val = val_samples[class_label][0] if len(val_samples[class_label]) > 0 else None
+        if img_val is not None:
+            axes[class_label, 1].imshow(img_val.squeeze(), cmap="gray")
+        axes[class_label, 1].axis("off")
+
+        # Column 3: Test set (1st sample per class)
+        img_test1 = test_samples[class_label][0] if len(test_samples[class_label]) > 0 else None
+        if img_test1 is not None:
+            axes[class_label, 2].imshow(img_test1.squeeze(), cmap="gray")
+        axes[class_label, 2].axis("off")
+
+        # Column 4: Test set (2nd sample per class)
+        img_test2 = test_samples[class_label][1] if len(test_samples[class_label]) > 1 else None
+        if img_test2 is not None:
+            axes[class_label, 3].imshow(img_test2.squeeze(), cmap="gray")
+        axes[class_label, 3].axis("off")
+
+    # Column titles
+    column_titles = ["Train", "Validation", "Test 1", "Test 2"]
+    for col in range(4):
+        axes[0, col].set_title(column_titles[col], fontsize=12)
+
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.88)  # Add space for the title
+    plt.show()
+
+
 ## FUNCTIONS FOR ABLATION STUDY AND STATS ON SENN
 
 # Ablation study

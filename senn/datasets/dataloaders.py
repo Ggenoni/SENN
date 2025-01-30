@@ -41,6 +41,10 @@ class ConfoundedDataset(Dataset):
             transforms.Normalize((0.5,), (0.5,))  # Standard normalization
         ])
 
+        # 🔥 Add an attribute to allow `.data` access
+        if hasattr(self.dataset, "data"):
+            self.data = self.dataset.data  # Reference the underlying dataset data
+
     def _generate_fixed_positions(self):
         positions = {label: (random.randint(5, 22), random.randint(5, 22)) for label in range(self.num_classes)}
         return positions
@@ -48,9 +52,7 @@ class ConfoundedDataset(Dataset):
     def _add_dot(self, image, label):
         draw = ImageDraw.Draw(image)
         position = self.fixed_positions[label] if self.is_train else (random.randint(5, 22), random.randint(5, 22))
-        draw.ellipse([
-            position[0], position[1], position[0] + self.dot_size, position[1] + self.dot_size
-        ], fill=255)
+        draw.ellipse([position[0], position[1], position[0] + self.dot_size, position[1] + self.dot_size], fill=255)
         return image
 
     def __len__(self):
@@ -63,6 +65,7 @@ class ConfoundedDataset(Dataset):
         return image, label
 
 
+
 def load_confounded_mnist(data_path, batch_size, num_workers=0, valid_size=0.1, **kwargs):
     return load_confounded_dataset(data_path, batch_size, num_workers, valid_size, dataset_type='mnist')
 
@@ -70,11 +73,11 @@ def load_confounded_fashionmnist(data_path, batch_size, num_workers=0, valid_siz
     return load_confounded_dataset(data_path, batch_size, num_workers, valid_size, dataset_type='fashion-mnist')
 
 def load_confounded_dataset(data_path, batch_size, num_workers=0, valid_size=0.1, dataset_type='mnist'):
-    transform = transforms.Compose([transforms.ToTensor()])
     dataset_cls = MNIST if dataset_type == 'mnist' else FashionMNIST
 
-    train_set = dataset_cls(data_path, train=True, download=True, transform=transforms.ToPILImage())
-    test_set = dataset_cls(data_path, train=False, download=True, transform=transforms.ToPILImage())
+    # REMOVE `transforms.ToPILImage()`, USE `transform=None`
+    train_set = dataset_cls(data_path, train=True, download=True, transform=None)
+    test_set = dataset_cls(data_path, train=False, download=True, transform=None)
     
     confounded_train_set = ConfoundedDataset(train_set, is_train=True)
     confounded_test_set = ConfoundedDataset(test_set, is_train=False)
@@ -91,6 +94,7 @@ def load_confounded_dataset(data_path, batch_size, num_workers=0, valid_size=0.1
     test_loader = DataLoader(confounded_test_set, shuffle=False, **dataloader_args)
     
     return train_loader, valid_loader, test_loader
+
 
 
 def load_fashion_mnist(data_path, batch_size, num_workers=0, valid_size=0.1, **kwargs):

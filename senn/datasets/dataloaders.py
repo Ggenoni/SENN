@@ -13,7 +13,7 @@ from torchvision import datasets
 from torchvision.datasets import MNIST, FashionMNIST
 from torch.utils.data import DataLoader, Dataset, SubsetRandomSampler
 import random
-from PIL import ImageDraw
+from PIL import ImageDraw, Image
 
 
 def get_dataloader(config):
@@ -29,30 +29,62 @@ def get_dataloader(config):
     elif config.dataloader.lower() == 'compas':
         return load_compas(**config.__dict__)
 
+
 class ConfoundedDataset(Dataset):
     def __init__(self, dataset, is_train=True, dot_size=3):
         self.dataset = dataset
         self.is_train = is_train
         self.dot_size = dot_size
-        self.num_classes = 10  # Both MNIST and Fashion-MNIST have 10 classes
+        self.num_classes = 10  # MNIST and Fashion-MNIST both have 10 classes
         self.fixed_positions = self._generate_fixed_positions()
         self.transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize((0.5,), (0.5,))  # Standard normalization
+            transforms.Normalize((0.5,), (0.5,))
         ])
 
-        # 🔥 Add an attribute to allow `.data` access
         if hasattr(self.dataset, "data"):
-            self.data = self.dataset.data  # Reference the underlying dataset data
+            self.data = self.dataset.data  # Reference the dataset data
 
     def _generate_fixed_positions(self):
-        positions = {label: (random.randint(5, 22), random.randint(5, 22)) for label in range(self.num_classes)}
+        """
+        Defines unique positions for each class in the 28x28 image grid.
+        Adjusted to prevent any overlap with digit areas while keeping all dots visible.
+        """
+        positions = {
+            0: (2, 2),      # Top-left corner
+            1: (2, 25),     # Top-right corner
+            2: (25, 2),     # Bottom-left corner
+            3: (25, 25),    # Bottom-right corner
+            4: (14, 0),     # Top-center, inside frame
+            5: (14, 25),    # Bottom-center
+            6: (2, 14),     # Left-center
+            7: (25, 14),    # Right-center
+            8: (26, 22),    # Bottom-right but inside frame
+            9: (20, -1),     # Top-right, but fully visible
+        }
         return positions
 
     def _add_dot(self, image, label):
+        """
+        Adds a confounder dot at a predefined class-specific position (train)
+        or at a randomly selected position from the other class positions (test).
+        """
         draw = ImageDraw.Draw(image)
-        position = self.fixed_positions[label] if self.is_train else (random.randint(5, 22), random.randint(5, 22))
-        draw.ellipse([position[0], position[1], position[0] + self.dot_size, position[1] + self.dot_size], fill=255)
+
+        if self.is_train:
+            # Always place confounder at the fixed position assigned to the class
+            position = self.fixed_positions[label]
+        else:
+            # Test set: choose a confounder position from another class (excluding its own)
+            other_classes = list(set(self.fixed_positions.keys()) - {label})
+            mapped_class = random.choice(other_classes)  # Pick a random different class
+            position = self.fixed_positions[mapped_class]
+
+        # Draw the confounder dot at the selected position
+        draw.ellipse(
+            [position[0], position[1], position[0] + self.dot_size, position[1] + self.dot_size],
+            fill=255
+        )
         return image
 
     def __len__(self):
@@ -60,9 +92,12 @@ class ConfoundedDataset(Dataset):
 
     def __getitem__(self, idx):
         image, label = self.dataset[idx]
-        image = self._add_dot(image, label)  # Add confounder dot
-        image = self.transform(image)  # Convert PIL image to tensor here!
+        image = self._add_dot(image, label)  # Add class-specific confounder
+        image = self.transform(image)  # Convert PIL image to tensor
         return image, label
+
+
+
 
 
 

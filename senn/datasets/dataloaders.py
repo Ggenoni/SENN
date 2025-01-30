@@ -35,52 +35,58 @@ class ConfoundedDataset(Dataset):
         self.dataset = dataset
         self.is_train = is_train
         self.dot_size = dot_size
-        self.num_classes = 10  # MNIST and Fashion-MNIST both have 10 classes
+        self.num_classes = 10
         self.fixed_positions = self._generate_fixed_positions()
         self.transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,))
         ])
+        
+        # Store a fixed mapping of dot positions for the test set
+        self.test_dot_positions = {}
+        if not self.is_train:
+            self._assign_fixed_test_positions()
 
         if hasattr(self.dataset, "data"):
-            self.data = self.dataset.data  # Reference the dataset data
+            self.data = self.dataset.data  # Reference dataset data
 
     def _generate_fixed_positions(self):
-        """
-        Defines unique positions for each class in the 28x28 image grid.
-        Adjusted to prevent any overlap with digit areas while keeping all dots visible.
-        """
+        """Defines unique positions for each class in the 28x28 image grid."""
         positions = {
-            0: (2, 2),      # Top-left corner
-            1: (2, 25),     # Top-right corner
-            2: (25, 2),     # Bottom-left corner
-            3: (25, 25),    # Bottom-right corner
-            4: (14, 0),     # Top-center, inside frame
-            5: (14, 25),    # Bottom-center
-            6: (2, 14),     # Left-center
-            7: (25, 14),    # Right-center
-            8: (26, 22),    # Bottom-right but inside frame
-            9: (20, -1),     # Top-right, but fully visible
+            0: (2, 2),      
+            1: (2, 25),     
+            2: (25, 2),     
+            3: (25, 25),    
+            4: (14, 0),     
+            5: (14, 25),    
+            6: (2, 14),     
+            7: (25, 14),    
+            8: (26, 22),    
+            9: (20, -1),
         }
         return positions
 
-    def _add_dot(self, image, label):
+    def _assign_fixed_test_positions(self):
         """
-        Adds a confounder dot at a predefined class-specific position (train)
-        or at a randomly selected position from the other class positions (test).
+        Assigns a **fixed** confounder dot position to each test sample.
+        Ensures the same sample always gets the same dot placement.
         """
+        for idx in range(len(self.dataset)):
+            _, label = self.dataset[idx]  # Retrieve label
+            other_classes = list(set(self.fixed_positions.keys()) - {label})
+            mapped_class = other_classes[idx % len(other_classes)]  # Deterministic mapping
+            self.test_dot_positions[idx] = self.fixed_positions[mapped_class]
+
+    def _add_dot(self, image, label, idx):
+        """Adds the confounder dot at a fixed position."""
         draw = ImageDraw.Draw(image)
 
         if self.is_train:
-            # Always place confounder at the fixed position assigned to the class
             position = self.fixed_positions[label]
         else:
-            # Test set: choose a confounder position from another class (excluding its own)
-            other_classes = list(set(self.fixed_positions.keys()) - {label})
-            mapped_class = random.choice(other_classes)  # Pick a random different class
-            position = self.fixed_positions[mapped_class]
+            # Use the **stored** test dot position to ensure consistency
+            position = self.test_dot_positions[idx]
 
-        # Draw the confounder dot at the selected position
         draw.ellipse(
             [position[0], position[1], position[0] + self.dot_size, position[1] + self.dot_size],
             fill=255
@@ -92,9 +98,10 @@ class ConfoundedDataset(Dataset):
 
     def __getitem__(self, idx):
         image, label = self.dataset[idx]
-        image = self._add_dot(image, label)  # Add class-specific confounder
+        image = self._add_dot(image, label, idx)  # Add confounder at fixed test position
         image = self.transform(image)  # Convert PIL image to tensor
         return image, label
+
 
 
 

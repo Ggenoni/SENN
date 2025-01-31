@@ -296,60 +296,6 @@ def compute_completeness_gap(model, input_image, baseline, target_class):
     return completeness_gap, attributions
 
 
-
-# Function to compute Sensitivity Analysis
-def compute_sensitivity_analysis(model, input_image, baseline, target_class, noise_std=0.5, num_perturbations=5):
-    """
-    Performs sensitivity analysis by adding noise to the input and comparing the resulting attributions.
-
-    Args:
-        model: The model to evaluate.
-        input_image: Input image tensor of shape (1, C, H, W).
-        baseline: Baseline image tensor of shape (1, C, H, W).
-        target_class: The target class index for which the attributions are computed.
-        noise_std: Standard deviation of Gaussian noise to add (set to a high value for this test).
-        num_perturbations: Number of perturbed inputs to generate.
-
-    Returns:
-        sensitivity_scores: List of similarity scores between original and perturbed attributions.
-        all_attributions: List of all perturbed attributions.
-        perturbed_predictions: List of model predictions for perturbed inputs.
-    """
-    # Initialize Integrated Gradients
-    ig = IntegratedGradients(model)
-
-    # Compute original attributions
-    original_attributions = ig.attribute(input_image, baseline, target=target_class).squeeze().detach().numpy()
-
-    sensitivity_scores = []
-    all_attributions = []
-    perturbed_predictions = []
-
-    for _ in range(num_perturbations):
-        # Add Gaussian noise to the input image (with high noise level)
-        noise = torch.randn_like(input_image) * noise_std
-        perturbed_input = input_image + noise
-
-        # Compute attributions for the perturbed input
-        perturbed_attributions = ig.attribute(perturbed_input, baseline, target=target_class).squeeze().detach().numpy()
-        all_attributions.append(perturbed_attributions)
-
-        # Get model prediction for the perturbed input
-        perturbed_prediction = torch.argmax(model(perturbed_input), dim=1).item()
-        perturbed_predictions.append(perturbed_prediction)
-
-        # Compute similarity between original and perturbed attributions
-        similarity, _ = ssim(
-            original_attributions,
-            perturbed_attributions,
-            data_range=original_attributions.max() - original_attributions.min(),
-            full=True
-        )
-        sensitivity_scores.append(similarity)
-
-    return sensitivity_scores, original_attributions, all_attributions, perturbed_predictions
-
-
 # Function to apply challenging transformations
 def apply_challenging_transformations(input_image):
     """
@@ -447,6 +393,84 @@ def sensitivity_analysis(model, input_image, baseline, target_class, challenging
 
     return sensitivity_scores, original_attributions, all_attributions, predictions
 
+
+# Masking relevan pixels
+def predict_on_masked_pixels(image, model, ig_attributions, predicted_label, pixel_steps=[10, 50, 100, 200, 500]):
+    """
+    Visualize the impact of masking top important pixels (IG-based) on confidence.
+
+    Parameters:
+        image (numpy.ndarray): 2D grayscale image (28x28).
+        model (torch.nn.Module): The trained model.
+        ig_attributions (numpy.ndarray): Integrated Gradients attributions (28x28).
+        predicted_label (int): The model’s predicted class.
+        pixel_steps (list): List of numbers of top pixels to mask.
+
+    Returns:
+        None
+    """
+    # Convert image to float and normalize
+    image = np.copy(image)  # Prevent modifying the original data
+
+    # Convert grayscale image to RGB for visualization
+    image_rgb = gray2rgb(image)
+
+    # Flatten IG attributions and get indices of top pixels
+    ig_flat = ig_attributions.flatten()
+    pixel_ranks = np.argsort(-np.abs(ig_flat))  # Sort by absolute importance
+
+    # Predict function
+    predict_with_model = partial(predict_function, model=model)
+
+    # Get original confidence
+    original_confidence = predict_function([image_rgb], model)[0, predicted_label]
+    print(f"Original Confidence for Predicted Label {predicted_label}: {original_confidence:.2f}")
+
+    # Plot results
+    num_steps = len(pixel_steps)
+    fig, axes = plt.subplots(2, num_steps, figsize=(4 * num_steps, 8))
+    plt.suptitle(f"True Label: {predicted_label}", fontsize=16)
+
+    # Iterate over pixel removal steps
+    for i, k in enumerate(pixel_steps):
+        perturbed_image = np.copy(image)  # Copy to prevent modifying original
+        mask_visualization = np.copy(image_rgb)
+
+        # Mask the top-k most important pixels
+        for pixel_idx in pixel_ranks[:k]:
+            row, col = np.unravel_index(pixel_idx, image.shape)
+            perturbed_image[row, col] = 0  # Mask pixel with black
+            mask_visualization[row, col] = [1, 0, 0]  # Highlight in red
+
+        # Predict on the masked image
+        perturbed_probabilities = predict_function([gray2rgb(perturbed_image)], model)[0]
+        perturbed_confidence = perturbed_probabilities[predicted_label]
+        perturbed_prediction = np.argmax(perturbed_probabilities)
+
+        # Compute confidence drop
+        confidence_drop = (original_confidence - perturbed_confidence) / original_confidence
+
+        # Print results
+        print(f"\nTop-{k} Pixels Masked:")
+        print(f"    Perturbed Confidence: {perturbed_confidence:.2f}")
+        print(f"    Confidence Drop: {confidence_drop:.2%}")
+        print(f"    Predicted Label After Masking: {perturbed_prediction}")
+
+        # Plot the perturbed image
+        axes[0, i].imshow(perturbed_image, cmap="gray", interpolation="nearest")
+        axes[0, i].set_title(
+            f"Top-{k} Masked\nConf Drop: {confidence_drop:.2%}\nPred: {perturbed_prediction}",
+            fontsize=10
+        )
+        axes[0, i].axis("off")
+
+        # Plot the mask visualization
+        axes[1, i].imshow(mask_visualization, interpolation="nearest")
+        axes[1, i].set_title(f"Masked Pixels (Top-{k})", fontsize=10)
+        axes[1, i].axis("off")
+
+    plt.tight_layout()
+    plt.show()
 
 ## FUNCTIONS FOR LIME 
 

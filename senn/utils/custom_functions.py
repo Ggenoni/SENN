@@ -161,22 +161,6 @@ def analyze_relevance_scores_by_predicted_class(model, test_loader, num_concepts
         for i in range(num_concepts)
     }
 
-    # Visualize relevance scores
-    concept_means = [stat["mean"] for stat in relevance_stats.values()]
-    concept_stds = [stat["std"] for stat in relevance_stats.values()]
-
-    plt.figure(figsize=(10, 6))
-    x = np.arange(num_concepts)
-
-    # Plot bar chart with error bars
-    plt.bar(x, concept_means, yerr=concept_stds, capsize=5, alpha=0.7, color='blue', label="Mean Relevance")
-    plt.xticks(x, [f"Concept {i+1}" for i in range(num_concepts)])
-    plt.xlabel("Concepts")
-    plt.ylabel("Relevance Scores (Predicted Class)")
-    plt.title("Relevance Scores (Theta) Across the Dataset (Predicted Class Only)")
-    plt.legend()
-    plt.show()
-
     return relevance_stats
 
 
@@ -239,23 +223,6 @@ def analyze_class_specific_relevance(model, test_loader, num_classes, num_concep
                 for i in range(num_concepts)
             }
 
-    # Visualize relevance scores by class
-    for cls, stats in class_relevance_stats.items():
-        concept_means = [stat["mean"] for stat in stats.values()]
-        concept_stds = [stat["std"] for stat in stats.values()]
-
-        plt.figure(figsize=(10, 6))
-        x = np.arange(num_concepts)
-
-        # Plot bar chart with error bars
-        plt.bar(x, concept_means, yerr=concept_stds, capsize=5, alpha=0.7, color='blue', label=f"Class {cls}")
-        plt.xticks(x, [f"Concept {i+1}" for i in range(num_concepts)])
-        plt.xlabel("Concepts")
-        plt.ylabel("Relevance Scores")
-        plt.title(f"Relevance Scores (Theta) for Class {cls}")
-        plt.legend()
-        plt.show()
-
     return class_relevance_stats
 
 
@@ -294,6 +261,60 @@ def compute_completeness_gap(model, input_image, baseline, target_class):
     completeness_gap = abs(attribution_sum - (input_prediction - baseline_prediction))
 
     return completeness_gap, attributions
+
+
+
+# Function to compute Sensitivity Analysis
+def compute_sensitivity_analysis(model, input_image, baseline, target_class, noise_std=0.5, num_perturbations=5):
+    """
+    Performs sensitivity analysis by adding noise to the input and comparing the resulting attributions.
+
+    Args:
+        model: The model to evaluate.
+        input_image: Input image tensor of shape (1, C, H, W).
+        baseline: Baseline image tensor of shape (1, C, H, W).
+        target_class: The target class index for which the attributions are computed.
+        noise_std: Standard deviation of Gaussian noise to add (set to a high value for this test).
+        num_perturbations: Number of perturbed inputs to generate.
+
+    Returns:
+        sensitivity_scores: List of similarity scores between original and perturbed attributions.
+        all_attributions: List of all perturbed attributions.
+        perturbed_predictions: List of model predictions for perturbed inputs.
+    """
+    # Initialize Integrated Gradients
+    ig = IntegratedGradients(model)
+
+    # Compute original attributions
+    original_attributions = ig.attribute(input_image, baseline, target=target_class).squeeze().detach().numpy()
+
+    sensitivity_scores = []
+    all_attributions = []
+    perturbed_predictions = []
+
+    for _ in range(num_perturbations):
+        # Add Gaussian noise to the input image (with high noise level)
+        noise = torch.randn_like(input_image) * noise_std
+        perturbed_input = input_image + noise
+
+        # Compute attributions for the perturbed input
+        perturbed_attributions = ig.attribute(perturbed_input, baseline, target=target_class).squeeze().detach().numpy()
+        all_attributions.append(perturbed_attributions)
+
+        # Get model prediction for the perturbed input
+        perturbed_prediction = torch.argmax(model(perturbed_input), dim=1).item()
+        perturbed_predictions.append(perturbed_prediction)
+
+        # Compute similarity between original and perturbed attributions
+        similarity, _ = ssim(
+            original_attributions,
+            perturbed_attributions,
+            data_range=original_attributions.max() - original_attributions.min(),
+            full=True
+        )
+        sensitivity_scores.append(similarity)
+
+    return sensitivity_scores, original_attributions, all_attributions, perturbed_predictions
 
 
 # Function to apply challenging transformations
@@ -394,7 +415,7 @@ def sensitivity_analysis(model, input_image, baseline, target_class, challenging
     return sensitivity_scores, original_attributions, all_attributions, predictions
 
 
-# Masking relevan pixels
+# Masking pixels
 def predict_on_masked_pixels(image, model, ig_attributions, predicted_label, pixel_steps=[10, 50, 100, 200, 500]):
     """
     Visualize the impact of masking top important pixels (IG-based) on confidence.

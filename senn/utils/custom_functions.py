@@ -460,7 +460,7 @@ def predict_on_masked_pixels(image, model, ig_attributions, predicted_label, pix
         # Mask the top-k most important pixels
         for pixel_idx in pixel_ranks[:k]:
             row, col = np.unravel_index(pixel_idx, image.shape)
-            perturbed_image[row, col] = 0  # Mask pixel with black
+            perturbed_image[row, col] = 0.0  # Mask pixel with black
             mask_visualization[row, col] = [1, 0, 0]  # Highlight in red
 
         # Predict on the masked image
@@ -478,7 +478,7 @@ def predict_on_masked_pixels(image, model, ig_attributions, predicted_label, pix
         print(f"    Predicted Label After Masking: {perturbed_prediction}")
 
         # Plot the perturbed image
-        axes[0, i].imshow(perturbed_image, cmap="gray", interpolation="nearest")
+        axes[0, i].imshow(perturbed_image, cmap="gray", vmin=0, vmax=1, interpolation="nearest")
         axes[0, i].set_title(
             f"Top-{k} Masked\nConf Drop: {confidence_drop:.2%}\nPred: {perturbed_prediction}",
             fontsize=10

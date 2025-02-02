@@ -1,7 +1,7 @@
-# Evaluating Explainable AI.
-# A Comparative Study of SENN, IG, and LIME
-By Alessandra Gandini and Gaudenzia Genoni
+# Evaluating Explainable AI. A Comparative Study of SENN, IG, and LIME
+By Alessandra Gandini and Gaudenzia Genoni  
 University of Trento
+***
 
 The study compares the intelligibility and faithfulness of explanations from a self-explainable neural
 network (SENN) and two post-hoc methods—Integrated Gradients (IG) and LIME—on MNIST and

@@ -11,4 +11,4 @@ provide meaningful explanations, while IG and LIME offer more faithful and inter
 tions. Confounded MNIST reveals the Clever Hans effect, underscoring the need for robust evaluation
 methods in Explainable AI.
 
-==> To reproduce the experiments, run Notebook_1_MNIST.ipynb and Notebook_2_CONFOUNDED.ipynb (using Google Colab is suggested).
+==> To reproduce the experiments, you can run Notebook_1_MNIST.ipynb and Notebook_2_CONFOUNDED.ipynb (using Google Colab is suggested).

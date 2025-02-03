@@ -30,8 +30,8 @@ reveal the typical Clever Hans effect.
 5. IG explanation sample for MNIST: ![](images/MNIST/IG/attribution_maps_original_inputs/0_IG_original.png)
 6. IG explanation sample for Confounded MNIST: ![](images/COUNFOUNDED_MNIST/IG/map_attributions/8_IG_conf.png)
 7. IG faithfulness on masked-pixels: ![](images/MNIST/IG/masked_pixels/3_masked_IG.png)
-8. LIME explanations for MNIST: ![](images/MNIST/LIME/LIME_explanations.png)
-9. LIME explanations for Confounded MNIST: ![](images/COUNFOUNDED_MNIST/LIME/LIME_conf_explanations.png)
+8. LIME explanation samples for MNIST: ![](images/LIME_mnist.png)
+9. LIME explanation samples for Confounded MNIST: ![](images/LIME_conf.png)
 10. LIME faithfulness on masked-superpixels: ![](images/MNIST/LIME/masked_superpixels/2_masked.png)
 
 ## Authors

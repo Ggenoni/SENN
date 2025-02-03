@@ -5,7 +5,7 @@ University of Trento
 
 The study compares the intelligibility and faithfulness of explanations from a self-explainable neural
 network (SENN) and two post-hoc methods—Integrated Gradients (IG) and LIME—on MNIST and
-Confounded MNIST, a dataset designed to evaluate model reliance on spurious features. Through
+on a confounded MNIST dataset. Through
 a primarily qualitative analysis, supported by quantitative measures, we show that SENN fails to
 provide meaningful explanations, while IG and LIME offer more faithful and interpretable attributions. Confounded MNIST reveals the Clever Hans effect.
 

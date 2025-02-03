@@ -3,11 +3,12 @@ By Alessandra Gandini and Gaudenzia Genoni
 University of Trento
 ***
 
-The study compares the intelligibility and faithfulness of explanations from a self-explainable neural
+This study compares the intelligibility and faithfulness of explanations from a self-explainable neural
 network (SENN) and two post-hoc methods—Integrated Gradients (IG) and LIME—on MNIST and
-on a confounded MNIST dataset. Through
-a primarily qualitative analysis, supported by quantitative measures, we show that SENN fails to
-provide meaningful explanations, while IG and LIME offer more faithful and interpretable attributions. Confounded MNIST reveals the Clever Hans effect.
+on a confounded MNIST dataset. Through a primarily qualitative analysis, supported by quantitative
+measures, we show that SENN fails to provide meaningful explanations, while IG and LIME offer
+more faithful and interpretable attributions. IG and LIME evaluations on the Confounded MNIST
+reveal the typical Clever Hans effect.  
 
 ## Project Structure
 <img src="images/UML-SENN.png" alt="Project Structure" width="720">

@@ -1,7 +1,7 @@
 # Evaluating Explainable AI. A Comparative Study of SENN, IG, and LIME
 By Alessandra Gandini and Gaudenzia Genoni  
 Machine Learning for NLP II (Professor Stefano Teso)  
-University of Trento
+University of Trento, 2024-2025
 ***
 
 This repository contains the code for reproducing our final ML course paper, ["Evaluating Explainable AI. A Comparative Study of SENN, IG, and LIME"](Report.pdf). In the study, we compare the intelligibility and faithfulness of explanations from a self-explainable neural

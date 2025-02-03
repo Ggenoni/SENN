@@ -3,7 +3,7 @@ By Alessandra Gandini and Gaudenzia Genoni
 University of Trento
 ***
 
-This study compares the intelligibility and faithfulness of explanations from a self-explainable neural
+The study compares the intelligibility and faithfulness of explanations from a self-explainable neural
 network (SENN) and two post-hoc methods—Integrated Gradients (IG) and LIME—on MNIST and
 on a confounded MNIST dataset. Through a primarily qualitative analysis, supported by quantitative
 measures, we show that SENN fails to provide meaningful explanations, while IG and LIME offer

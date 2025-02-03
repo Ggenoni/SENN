@@ -7,9 +7,7 @@ The study compares the intelligibility and faithfulness of explanations from a s
 network (SENN) and two post-hoc methods—Integrated Gradients (IG) and LIME—on MNIST and
 Confounded MNIST, a dataset designed to evaluate model reliance on spurious features. Through
 a primarily qualitative analysis, supported by quantitative measures, we show that SENN fails to
-provide meaningful explanations, while IG and LIME offer more faithful and interpretable attribu-
-tions. Confounded MNIST reveals the Clever Hans effect, underscoring the need for robust evaluation
-methods in Explainable AI.
+provide meaningful explanations, while IG and LIME offer more faithful and interpretable attributions. Confounded MNIST reveals the Clever Hans effect.
 
 ## Project Structure
 <img src="images/UML-SENN.png" alt="Project Structure" width="720">

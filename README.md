@@ -15,4 +15,6 @@ methods in Explainable AI.
 <img src="images/UML-SENN.png" alt="Project Structure" width="720">
 (credit https://github.com/AmanDaVinci/SENN.git)
 
-==> To reproduce the experiments, you can run Notebook_1_MNIST.ipynb and Notebook_2_CONFOUNDED.ipynb (using Google Colab is suggested).
+
+
+==> To reproduce our experiments, run Notebook_1_MNIST.ipynb and Notebook_2_CONFOUNDED.ipynb (using Google Colab is suggested).

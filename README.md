@@ -35,8 +35,8 @@ reveal the typical Clever Hans effect.
 10. LIME faithfulness on masked-superpixels: ![](images/MNIST/LIME/masked_superpixels/2_masked.png)
 
 ## Authors
-* Alessandra Gandini (alessandra.gandini@studenti.unitn.it) 
-* Gaudenzia Genoni (gaudenzia.genoni@studenti.unitn.it)
+* Alessandra Gandini [@alegandini](https://github.com/alegandini)
+* Gaudenzia Genoni [@Ggenoni](https://github.com/Ggenoni)
 
 ## References
 David Alvarez-Melis and Tommi Jaakkola. Towards robust interpretability with self-
